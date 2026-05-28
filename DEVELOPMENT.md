@@ -12,7 +12,8 @@ A handoff doc so a future session can pick up where this one stopped without re-
 - Tool-using chat: the model emits a tool call, the tool runs, and the model's follow-up summary streams as Markdown in the same `rich.Live` region.
 - Spinner during first-token latency.
 - `prompt_toolkit` input with persistent history at `~/.config/io.datasette.llm/llmchat_history.txt`.
-- Slash commands `/exit`, `/quit`, `/new`, `/tools`.
+- Slash commands `/exit`, `/quit`, `/new`.
+- Inline tool-call indicators: each invocation prints `↪ name({args})` above the live region in real time, surfacing the model's internal back-and-forth across multi-step chains.
 - Auto-loading top-level functions from `~/.config/io.datasette.llm/tools/brave_tools.py` and exposing them as tools to the underlying `llm` model.
 
 ## How the tool roundtrip works
@@ -21,7 +22,7 @@ The REPL mirrors `simonw/llm`'s own CLI (`llm/cli.py:826`):
 
 - When tools are loaded, the chat call is `conversation.chain(user_input, tools=tools, after_call=_after_tool_call)`. The `Conversation.chain` method (`llm/models.py:468`) auto-executes tool calls, feeds the results back to the model, and threads conversation history across steps.
 - The returned `ChainResponse` iterates plain strings via `__iter__` (`llm/models.py:1669`) — `yield from response_item` flattens chunks across every chain step into a single stream, so a single `for chunk in response:` loop drives the live Markdown render for both the pre-tool and post-tool segments.
-- `/tools` debug output is emitted from the `after_call` callback as each tool returns, matching the CLI's `--td` pattern (`llm/cli.py:3959`).
+- The inline tool-call indicator is emitted from a `before_call` callback passed to `conversation.chain(...)`, firing in real time as each tool is invoked (cf. the CLI's `--td` pattern at `llm/cli.py:3959`).
 
 Earlier attempts (preserved here as context for anyone re-investigating):
 
@@ -43,7 +44,7 @@ Earlier attempts (preserved here as context for anyone re-investigating):
 
 - `llmchat/__init__.py`
   - `_run()` — picks `conversation.chain` (with tools) vs `conversation.prompt` (plain). The fix lives here.
-  - `_after_tool_call()` — closure callback that prints `/tools` debug lines.
+  - `_before_tool_call()` — closure callback that prints the `↪` inline tool-call indicator.
   - `for chunk in _run():` loop — single-level iteration; `ChainResponse` already flattens.
 
 ## Not in scope (intentional)

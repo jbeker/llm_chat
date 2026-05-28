@@ -37,13 +37,14 @@ llmchat
 
 You'll see a header showing the loaded model and any registered tools, then a `❯ ` prompt. Type and hit enter. Responses stream as rendered Markdown.
 
+When the model invokes a tool, the call is shown inline as a dim `↪ name({args})` line so you can see what's happening during multi-step reasoning.
+
 Slash commands:
 
-| Command  | Effect                                                 |
-| -------- | ------------------------------------------------------ |
-| `/exit`  | Quit the REPL (`/quit` and Ctrl-D also work).          |
-| `/new`   | Reset the conversation history.                        |
-| `/tools` | Toggle a debug line that prints each tool call.        |
+| Command | Effect                                        |
+| ------- | --------------------------------------------- |
+| `/exit` | Quit the REPL (`/quit` and Ctrl-D also work). |
+| `/new`  | Reset the conversation history.               |
 
 Prompt history is stored at `~/.config/io.datasette.llm/llmchat_history.txt` and recalled with the up arrow across sessions.
 

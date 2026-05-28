@@ -60,13 +60,12 @@ def main() -> None:
         f"[dim]model:[/dim] [bold]{model.model_id}[/bold]    "
         f"[dim]tools:[/dim] {tools_label}"
     )
-    console.print("[dim]commands: /exit  /new (reset)  /tools (toggle debug)[/dim]")
+    console.print("[dim]commands: /exit  /new (reset)[/dim]")
     console.print()
 
     HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
     session: PromptSession[str] = PromptSession(history=FileHistory(str(HISTORY_FILE)))
     conversation = model.conversation()
-    show_tool_debug = False
 
     while True:
         try:
@@ -83,27 +82,23 @@ def main() -> None:
             conversation = model.conversation()
             console.print("[dim]— conversation reset —[/dim]\n")
             continue
-        if user_input == "/tools":
-            show_tool_debug = not show_tool_debug
-            state = "on" if show_tool_debug else "off"
-            console.print(f"[dim]tool debug: {state}[/dim]\n")
-            continue
+
+        console.print()
 
         buffer: list[str] = []
         spinner = Spinner("dots", text="[dim]thinking…[/dim]")
 
-        def _after_tool_call(_tool: Any, tool_call: Any, _tool_result: Any) -> None:
-            if show_tool_debug:
-                console.print(
-                    f"[dim]→ {tool_call.name}({tool_call.arguments})[/dim]"
-                )
+        def _before_tool_call(_tool: Any, tool_call: Any) -> None:
+            console.print(
+                f"[dim italic]↪ {tool_call.name}({tool_call.arguments})[/dim italic]"
+            )
 
         # Mirrors llm/cli.py:826 — conversation.chain auto-executes tools and
         # threads history; model.chain creates a fresh conversation each call.
         def _run() -> Any:
             if tools:
                 return conversation.chain(
-                    user_input, tools=tools, after_call=_after_tool_call
+                    user_input, tools=tools, before_call=_before_tool_call
                 )
             return conversation.prompt(user_input, stream=True)
 
