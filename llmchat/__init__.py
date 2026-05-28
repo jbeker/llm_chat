@@ -42,22 +42,6 @@ def load_tool_functions(path: Path) -> list[Callable[..., Any]]:
     ]
 
 
-def _try_get_tool_calls(response: Any) -> list[Any]:
-    for attr in ("tool_calls", "_tool_calls"):
-        thing = getattr(response, attr, None)
-        if callable(thing):
-            try:
-                return list(thing())
-            except Exception:
-                pass
-        elif thing is not None:
-            try:
-                return list(thing)
-            except Exception:
-                pass
-    return []
-
-
 def main() -> None:
     console = Console()
 
@@ -107,19 +91,20 @@ def main() -> None:
 
         buffer: list[str] = []
         spinner = Spinner("dots", text="[dim]thinking…[/dim]")
-        response: Any = None
 
-        # model.chain() does the auto-execute-tools-and-loop dance.
-        # conversation.prompt(tools=...) only parses tool calls into the
-        # response object; it does NOT execute them or roundtrip.
+        def _after_tool_call(_tool: Any, tool_call: Any, _tool_result: Any) -> None:
+            if show_tool_debug:
+                console.print(
+                    f"[dim]→ {tool_call.name}({tool_call.arguments})[/dim]"
+                )
+
+        # Mirrors llm/cli.py:826 — conversation.chain auto-executes tools and
+        # threads history; model.chain creates a fresh conversation each call.
         def _run() -> Any:
             if tools:
-                if hasattr(model, "chain"):
-                    return model.chain(
-                        user_input, tools=tools, conversation=conversation
-                    )
-                if hasattr(conversation, "chain"):
-                    return conversation.chain(user_input, tools=tools)
+                return conversation.chain(
+                    user_input, tools=tools, after_call=_after_tool_call
+                )
             return conversation.prompt(user_input, stream=True)
 
         try:
@@ -130,20 +115,10 @@ def main() -> None:
                 transient=False,
                 vertical_overflow="visible",
             ) as live:
-                response = _run()
-                for chunk in response:
-                    if isinstance(chunk, str):
-                        text = chunk
-                    elif hasattr(chunk, "text") and callable(chunk.text):
-                        try:
-                            text = chunk.text()
-                        except Exception:
-                            text = str(chunk)
-                    else:
-                        text = str(chunk)
-                    if not text:
+                for chunk in _run():
+                    if not chunk:
                         continue
-                    buffer.append(text)
+                    buffer.append(chunk)
                     live.update(Markdown("".join(buffer)))
         except KeyboardInterrupt:
             console.print("\n[dim]— cancelled —[/dim]\n")
@@ -154,23 +129,6 @@ def main() -> None:
 
         if not buffer:
             console.print("[dim]— (no text produced) —[/dim]")
-
-        if show_tool_debug and response is not None:
-            # ChainResponse exposes the per-step Response objects via
-            # .responses(); each of those carries actual executed tool calls.
-            sub_responses: list[Any] = []
-            if hasattr(response, "responses"):
-                try:
-                    sub_responses = list(response.responses())
-                except Exception:
-                    sub_responses = []
-            if not sub_responses:
-                sub_responses = [response]
-            for sub in sub_responses:
-                for call in _try_get_tool_calls(sub):
-                    name = getattr(call, "name", getattr(call, "tool_name", "?"))
-                    args = getattr(call, "arguments", getattr(call, "tool_arguments", ""))
-                    console.print(f"[dim]→ {name}({args})[/dim]")
 
         console.print()
 

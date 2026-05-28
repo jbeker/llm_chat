@@ -2,10 +2,6 @@
 
 A small Python REPL that wraps the [`llm`](https://github.com/simonw/llm) library and gives it a chat UX that doesn't feel like talking to `cat`. Live-rendered Markdown so bullets, links, and code blocks survive streaming. A spinner during the gap between submitting a prompt and the first token. `prompt_toolkit` input with persistent history. Slash commands. Auto-loads a tool functions file from the standard `llm` config directory.
 
-## Status
-
-Plain chat works. **Tool-using chat does not yet render the model's follow-up after a tool runs** — see `DEVELOPMENT.md` for the open investigation.
-
 ## Requirements
 
 - Python 3.11 or newer.
